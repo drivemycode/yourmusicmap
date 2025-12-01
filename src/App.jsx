@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useDebounce } from "react-use";
 import { MusicBrainzApi } from 'musicbrainz-api';
+import { findFlagUrlByIso2Code } from 'country-flags-svg-v2';
 
 const LASTFM_BASE_URL = "https://ws.audioscrobbler.com/2.0/";
-const COUNTRY_FLAG_EMOJIS_URL = "https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/by-code.json";
 
 function App() {
   const mbApi = new MusicBrainzApi({
@@ -12,26 +12,14 @@ function App() {
     appContactInfo: 'user@mail.org',
   })
   const [searchTerm, setSearchTerm] = useState("Radiohead");
-  const [country, setCountry] = useState("");
+  const [countryFlag, setCountryFlag] = useState("");
+  const [artistEntity, setArtistEntity] = useState(null);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const LASTFM_API_KEY = import.meta.env.VITE_LASTFM_API_KEY
 
   useDebounce(
-    () => setDebouncedSearchTerm(searchTerm), 500, [searchTerm] 
+    () => setDebouncedSearchTerm(searchTerm), 1000, [searchTerm] 
   );
-
-const fetchCountryFlagEmojis = async () => {
-  try {
-    const res = await fetch(COUNTRY_FLAG_EMOJIS_URL);
-    const data = await res.json();
-
-    ret
-    console.log(data);
-
-  } catch {
-        console.error("Error getting country flag emojis:", err);
-  }
-}
 
 const fetchCountry = async () => {
       const url = new URL(LASTFM_BASE_URL);
@@ -56,14 +44,17 @@ const fetchCountry = async () => {
         }
         
         const artist_mb = await mbApi.lookup('artist', data.artist.mbid, ['aliases']);
-        setCountry(artist_mb.country);
+        setArtistEntity(artist_mb);
+        
+        const country_code = artist_mb.country;
+        const flagUrl = findFlagUrlByIso2Code(country_code);
+        setCountryFlag(flagUrl);
+
+        console.log(artist_mb);
       } catch (err) {
         console.error("Error fetching country:", err);
       }
 }
-  useEffect(() => {
-      fetchCountryFlagEmojis()
-  }, [])
 
   useEffect(() => {
     fetchCountry();
@@ -85,8 +76,11 @@ const fetchCountry = async () => {
         />
       </div>
       <div className="flex justify-center mt-4">
-      {country}
+        {countryFlag && <img src={countryFlag} alt="Country flag" />}
       </div>
+      {
+        artistEntity && <h2>{artistEntity["begin-area"] === null ? "No begin area found" : artistEntity["begin-area"]["name"]}</h2>
+      }
     </div>
   );
 }
