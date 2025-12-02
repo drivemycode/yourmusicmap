@@ -12,6 +12,7 @@
   "dependencies": {
     "country-flags-svg-v2": "^1.0.7",
     "leaflet": "^1.9.4",
+    "mapbox": "^1.0.0-beta10",
     "musicbrainz-api": "^0.26.0",
     "react": "^19.0.0-rc.1",
     "react-dom": "^19.0.0-rc.1",
