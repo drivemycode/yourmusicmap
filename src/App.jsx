@@ -4,9 +4,8 @@ import { useDebounce } from "react-use";
 import { MusicBrainzApi } from 'musicbrainz-api';
 import { findFlagUrlByIso2Code } from 'country-flags-svg-v2';
 
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import MarkerClusterGroup from "react-leaflet-cluster";
 import "leaflet/dist/leaflet.css";
+import Map from "./components/Map";
 
 
 const LASTFM_BASE_URL = "https://ws.audioscrobbler.com/2.0/";
@@ -20,7 +19,7 @@ const mbApi = new MusicBrainzApi({
 
 function App() {
 
-  const [searchTerm, setSearchTerm] = useState("Hans Zimmer");
+  const [searchTerm, setSearchTerm] = useState("Gorillaz");
   const [artistEntity, setArtistEntity] = useState(null);
 
   const [artistOriginFeatures, setArtistOriginFeatures] = useState(null);
@@ -79,31 +78,19 @@ function App() {
   }
 
 const fetchOrigin = async () => {
-      // refactor this to mb browse next time
-      const url = new URL(LASTFM_BASE_URL);
-      url.searchParams.set("method", "artist.getinfo");
-      url.searchParams.set("artist", searchTerm);
-      url.searchParams.set("api_key", LASTFM_API_KEY);
-      url.searchParams.set("format", "json");
-      url.searchParams.set("limit", "5");
 
       try {
-        // get artist info from lastfm
-        const res = await fetch(url);
-        if(!res.ok){
-          throw new Error('Failed to fetch artist from LastFM');
-        }
-        const data = await res.json();
-        console.log(data);
-        if(!Object.hasOwn(data, "artist")){
-          throw new Error('Failed to find artist of that name from LastFM');
-        }
-        if(!Object.hasOwn(data.artist, 'mbid')){
-          throw new Error('Failed to fetch artist MBID');
-        }
-        
+        // search artist from mb
+        const res = await mbApi.search('artist', {query: `${searchTerm}`});
+
+        if(res.count == 0){
+          throw new Error('Failed to find artist of that name from musicbrainz');
+        } 
+        const artist = res.artists[0]
+        console.log(res);
+
         // get artist mb entity
-        const artist_mb = await mbApi.lookup('artist', data.artist.mbid, ['aliases']);
+        const artist_mb = await mbApi.lookup('artist', artist.id, ['aliases']);
         setArtistEntity(artist_mb);
         fetchArtistOriginFeatures(artist_mb);
       } catch (err) {
@@ -134,20 +121,7 @@ const fetchOrigin = async () => {
       <div className="flex justify-center mt-4">
         <img src={artistOriginFeatures && findFlagUrlByIso2Code(artistOriginFeatures.properties.context.country.country_code)} alt="Country flag" className="w-md"/>
       </div>
-
-      <MapContainer center={artistOriginFeatures ? artistOriginFeatures.geometry.coordinates.toReversed() : [0, 0]} zoom={6} className="mt-4">
-        <TileLayer 
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        <MarkerClusterGroup>
-        <Marker position={artistOriginFeatures ? artistOriginFeatures.geometry.coordinates.toReversed() : [0, 0]}>
-          <Popup>
-                {artistEntity && <h2>{artistEntity["begin-area"] === null ? "No begin area found" : artistEntity["begin-area"]["name"]}</h2>}
-          </Popup>
-        </Marker>
-        </MarkerClusterGroup>
-      </MapContainer>
+        <Map artistEntity={artistEntity} artistOriginFeatures={artistOriginFeatures}></Map>
     </div>
   );
 }
