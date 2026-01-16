@@ -14,7 +14,6 @@ const TopArtists = () => {
         try {
             const topArtists = await fetchLastFMTopArtistsHelper(name);
             setArtists(topArtists);
-            console.log(topArtists);
         } catch(err) {
             console.error("There's been an error fetching your top artists on Lastfm", err)
         }
@@ -42,6 +41,7 @@ const TopArtists = () => {
           className="border rounded-lg p-2 w-64"
         />
       </div>
+      {console.log(artists)}
       <ArtistMap artists={artists}/>
         </div>
     )

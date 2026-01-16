@@ -17,5 +17,6 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## TODO list
 
-+ figure out how to efficiently get 100 api calls (caching in dictionary, database?)
++ figure out batch requesting (done; but bottlenecked by musicbrainz api; just get mb database)
 + figure out how to deal with markers stylistically (deal with clusters, markers in the same city, popups with artist image)
++ figure out how to deal with marker clusters

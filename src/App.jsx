@@ -64,8 +64,9 @@ export function App() {
       <div className="flex justify-center mt-4">
         <img src={artistOriginFeatures && findFlagUrlByIso2Code(artistOriginFeatures.properties.context.country.country_code)} alt="Country flag" className="w-md"/>
       </div>
-        {/* artists are an array [ [artist1.entity, artist1.originfeatures], ...  ] */}
-        <ArtistMap artists={[[artistEntity, artistOriginFeatures ]]}/>
+        {/* artists are an array [ [artist1.entity, artist1.originfeatures], ...  ] */
+        }
+        <ArtistMap artists={[ {"mb": artistEntity, "origin-features": artistOriginFeatures } ]}/>
     </div>
   );
 }

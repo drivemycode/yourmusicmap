@@ -6,7 +6,10 @@ import NotFoundPage from "./components/NotFoundPage.jsx";
 import About from "./components/About.jsx";
 import TopArtists from "./components/TopArtists.jsx";
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-
+import { Buffer } from 'buffer';
+if (!window.Buffer) {
+  window.Buffer = Buffer;
+}
 const router = createBrowserRouter([
   {path: "/", element: <App />},
   {path: "/about", element: <About />},

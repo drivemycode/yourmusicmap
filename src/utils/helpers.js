@@ -1,16 +1,17 @@
+import { MusicBrainzApi } from 'musicbrainz-api';
+
 const MAPBOX_BASE_URL = "https://api.mapbox.com/search";
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 const LASTFM_BASE_URL = "https://ws.audioscrobbler.com/2.0/";
 const LASTFM_API_KEY = import.meta.env.VITE_LASTFM_API_KEY
-
-
-import { MusicBrainzApi } from 'musicbrainz-api';
+const DB_API_URL = 'http://localhost:3000/artist-info';
 
 const mbApi = new MusicBrainzApi({
   appName: 'my-app',
   appVersion: '0.1.0',
   appContactInfo: 'user@mail.org',
 })
+
 
 export const fetchOriginHelper = async (artistName) => {
       try {
@@ -47,11 +48,11 @@ export const fetchArtistOriginFeaturesHelper = async (artist_mb) => {
       query += beginArea_mb.relations[i].area.name + " ";
 
     }
-    const url = new URL(`${MAPBOX_BASE_URL}/searchbox/v1/forward`);
+    const url = new URL(`${MAPBOX_BASE_URL}/geocode/v6/forward`);
     url.searchParams.set("q", query);
     url.searchParams.set("access_token", MAPBOX_ACCESS_TOKEN);
     url.searchParams.set("limit", "1");
-    url.searchParams.set("types", "district,city,locality");
+    url.searchParams.set("types", "district,place,locality");
 
     try {
         const res = await fetch(url);
@@ -85,7 +86,10 @@ export const fetchLastFMTopArtistsHelper = async (username) => {
         }
         const data = await res.json();
 
+        // data.topartists.artist is an array of the user's top artists
         const arr = formatArtistsHelper(data.topartists.artist);
+        formatArtistsHelperV2(data.topartists.artist);
+      
         return arr;
     } catch(err) {
         console.error('An error has occurred when trying to find your top LastFM artists', err);
@@ -94,15 +98,58 @@ export const fetchLastFMTopArtistsHelper = async (username) => {
     }
 }
 
-export const formatArtistsHelper = async (artists) => {
-    const n = artists.length;
+// fetches artist origins 
+export const formatArtistsHelper = async (artists, ) => {
+
+    const n = artists.length
     let formatted_artists = new Array(n);
 
-    for(let i = 0; i < n; i ++){
+    for(let i = 0; i < n; i += 1){
+        let artist_dict = {};
         const artist_mb = await fetchOriginHelper(artists[i].name);
         const artist_origin_features = await fetchArtistOriginFeaturesHelper(artist_mb);
 
-        formatted_artists[i] = [artist_mb, artist_origin_features];
+        artist_dict["mb"] = artist_mb;
+        artist_dict["origin-features"] = artist_origin_features;
+        artist_dict["playcount"] = artists[i].playcount
+        artist_dict["rank"] = artists[i]["@attr"]["rank"]
+        artist_dict["url"] = artists[i]["url"]
+
+        formatted_artists[i] = artist_dict;
     }
     return formatted_artists;
+}
+
+// format artists all at once in batch api calls
+export const formatArtistsHelperV2 = async (artists) => {
+  // use batch post
+
+  const artist_names = artists.map((artist) => artist.name.toLowerCase());
+  try {
+    const db_res = await fetch(
+        DB_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        names: artist_names
+      })
+      }
+    )
+  const data = await db_res.json();
+  console.log(data);
+  } catch(err) {
+        console.error('An error has occurred when trying to find your top LastFM artists', err);
+  }
+
+  const url = new URL(`${MAPBOX_BASE_URL}/geocode/v6/batch`)
+  url.searchParams.set("access_token", MAPBOX_ACCESS_TOKEN);
+  let post_body = [];
+  const n = artists.length;
+  for(let i = 0; i < n; i ++){
+      post_body.push({
+        "types": ["district", "place", "locality"],
+        // need to somehow get location
+      })
+  }
+
 }
