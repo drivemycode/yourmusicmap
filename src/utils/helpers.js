@@ -75,7 +75,7 @@ export const fetchLastFMTopArtistsHelper = async (username) => {
     url.searchParams.set("method", "user.gettopartists");
     url.searchParams.set("user", username);
     url.searchParams.set("period", "overall");
-    url.searchParams.set("limit", 5);
+    url.searchParams.set("limit", 10);
     url.searchParams.set("api_key", LASTFM_API_KEY);
     url.searchParams.set("format", "json");
     
@@ -88,6 +88,7 @@ export const fetchLastFMTopArtistsHelper = async (username) => {
 
         // data.topartists.artist is an array of the user's top artists
         const arr = formatArtistsHelper(data.topartists.artist);
+        console.log(data);
         formatArtistsHelperV2(data.topartists.artist);
       
         return arr;
@@ -131,12 +132,12 @@ export const formatArtistsHelperV2 = async (artists) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        // this needs to be a list of mbids
         names: artist_names
       })
       }
     )
   const data = await db_res.json();
-  console.log(data);
   } catch(err) {
         console.error('An error has occurred when trying to find your top LastFM artists', err);
   }

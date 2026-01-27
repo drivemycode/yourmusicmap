@@ -41,7 +41,6 @@ const TopArtists = () => {
           className="border rounded-lg p-2 w-64"
         />
       </div>
-      {console.log(artists)}
       <ArtistMap artists={artists}/>
         </div>
     )

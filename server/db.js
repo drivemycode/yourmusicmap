@@ -6,6 +6,6 @@ export const pool = new Pool({
   port: 5000,          
   user: 'musicbrainz',
   password: 'musicbrainz',
-  database: 'musicbrainz',
+  database: 'musicbrainz_db',
   statement_timeout: 5000
 });
