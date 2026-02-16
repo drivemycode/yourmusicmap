@@ -4,14 +4,12 @@ const MAPBOX_BASE_URL = "https://api.mapbox.com/search";
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 const LASTFM_BASE_URL = "https://ws.audioscrobbler.com/2.0/";
 const LASTFM_API_KEY = import.meta.env.VITE_LASTFM_API_KEY
-const DB_API_URL = 'http://localhost:3000/artist-info';
 
 const mbApi = new MusicBrainzApi({
   appName: 'my-app',
   appVersion: '0.1.0',
   appContactInfo: 'user@mail.org',
 })
-
 
 export const fetchOriginHelper = async (artistName) => {
       try {
@@ -88,7 +86,8 @@ export const fetchLastFMTopArtistsHelper = async (username) => {
 
         // data.topartists.artist is an array of the user's top artists
         const arr = formatArtistsHelper(data.topartists.artist);
-        console.log(data);
+        console.log("Last fm top artists get req result");
+        console.log(data); 
         formatArtistsHelperV2(data.topartists.artist);
       
         return arr;
@@ -100,47 +99,85 @@ export const fetchLastFMTopArtistsHelper = async (username) => {
 }
 
 // fetches artist origins 
-export const formatArtistsHelper = async (artists, ) => {
+export const formatArtistsHelper = async (artists) => {
+  const now = (typeof performance !== 'undefined' && performance.now) ? performance.now.bind(performance) : Date.now;
+  const start = now();
 
-    const n = artists.length
-    let formatted_artists = new Array(n);
+  const n = artists.length
+  let formatted_artists = new Array(n);
 
-    for(let i = 0; i < n; i += 1){
-        let artist_dict = {};
-        const artist_mb = await fetchOriginHelper(artists[i].name);
-        const artist_origin_features = await fetchArtistOriginFeaturesHelper(artist_mb);
+  for(let i = 0; i < n; i += 1){
+      let artist_dict = {};
+      const artist_mb = await fetchOriginHelper(artists[i].name);
+      const artist_origin_features = await fetchArtistOriginFeaturesHelper(artist_mb);
 
-        artist_dict["mb"] = artist_mb;
-        artist_dict["origin-features"] = artist_origin_features;
-        artist_dict["playcount"] = artists[i].playcount
-        artist_dict["rank"] = artists[i]["@attr"]["rank"]
-        artist_dict["url"] = artists[i]["url"]
+      artist_dict["mb"] = artist_mb;
+      artist_dict["origin-features"] = artist_origin_features;
+      artist_dict["playcount"] = artists[i].playcount
+      artist_dict["rank"] = artists[i]["@attr"]["rank"]
+      artist_dict["url"] = artists[i]["url"]
 
-        formatted_artists[i] = artist_dict;
-    }
-    return formatted_artists;
+      formatted_artists[i] = artist_dict;
+  }
+
+  const end = now();
+  const duration = end - start;
+  console.log(`formatArtistsHelper took ${duration.toFixed(2)} ms`);
+  // attach duration (ms) to the returned array as a non-enumerable property
+  Object.defineProperty(formatted_artists, 'durationMs', {
+    value: duration,
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+
+  return formatted_artists;
+}
+
+export const queryDB = async (query) => {
+  try {
+    const res = await fetch("/graphql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: query,
+      })
+    });
+
+    const json = await res.json();
+
+    console.log(json)
+  } catch(err) {
+        console.error(`An error has occurred when trying to execute ${query}`, err);
+  }
 }
 
 // format artists all at once in batch api calls
 export const formatArtistsHelperV2 = async (artists) => {
   // use batch post
+let q = "query {\n";
 
-  const artist_names = artists.map((artist) => artist.name.toLowerCase());
-  try {
-    const db_res = await fetch(
-        DB_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        // this needs to be a list of mbids
-        names: artist_names
-      })
-      }
-    )
-  const data = await db_res.json();
-  } catch(err) {
-        console.error('An error has occurred when trying to find your top LastFM artists', err);
+artists.forEach((a, i) => {
+  const name = (a.name ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const mbid = (a.mbid ?? "").trim();
+
+  if (!mbid) {
+    // name lookup (can return multiple)
+    q += `  a${i}: allArtists(condition: { name: "${name}" }, first: 10) {\n`;
+    q += `    nodes { gid name beginArea }\n`;
+    q += `  }\n`;
+  } else {
+    // mbid lookup (should return 0 or 1, so first: 1)
+    // UUID input is typically passed as a quoted string in GraphQL
+    q += `  a${i}: allArtists(condition: { gid: "${mbid}" }, first: 1) {\n`;
+    q += `    nodes { gid name beginArea }\n`;
+    q += `  }\n`;
   }
+  });
+
+  q += "}\n";
+
+  queryDB(q);
 
   const url = new URL(`${MAPBOX_BASE_URL}/geocode/v6/batch`)
   url.searchParams.set("access_token", MAPBOX_ACCESS_TOKEN);

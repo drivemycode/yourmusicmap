@@ -3,10 +3,6 @@ import MarkerClusterGroup from "react-leaflet-cluster";
 import ArtistPopup from './ArtistPopup';
 
 const ArtistMap = ({ artists 
-     // 2d array
-     // first element is artist entity
-     // second element is artist origin features
-
      // artists is an array of multiple artists
      // one artist is one dictionary of different attributes
 }) => {

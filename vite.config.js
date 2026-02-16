@@ -5,24 +5,27 @@ import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfil
 
 dns.setDefaultResultOrder('verbatim');
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-    server: {
-    host: '127.0.0.1'
+  server: {
+    host: '127.0.0.1',
+    proxy: {
+      '/graphql': {
+        target: 'http://localhost:5050',
+        changeOrigin: true,
+      },
+    },
   },
-   optimizeDeps: {
-        esbuildOptions: {
-            // Node.js global to browser globalThis
-            define: {
-                global: 'globalThis'
-            },
-            // Enable esbuild polyfill plugins
-            plugins: [
-                NodeGlobalsPolyfillPlugin({
-                    buffer: true
-                })
-            ]
-        }
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      },
+      plugins: [
+        NodeGlobalsPolyfillPlugin({
+          buffer: true
+        })
+      ]
     }
+  }
 })
