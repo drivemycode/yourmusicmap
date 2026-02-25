@@ -1,24 +1,19 @@
-# React + Vite
+# Setup guide (had to make this for myself after forgetting how to set up stuff on more than one occasion)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## setup local db
++ (link TBA) run local db based on musicbrainz db dump using docker here
++ ..after initial setup..
++ docker compose up -d musicbrainz
++ docker compose ps
++ docker compose exec db psql -U musicbrainz -d musicbrainz_db
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## setup website
++ npm run dev
 
 ## TODO list
-
 + refactor anything involving mbapi to just using the postgresql database
 + check if batch req for mapbox works
 + cache of (mbid, artist name, ..)
 + figure out how to deal with markers stylistically (deal with clusters, markers in the same city, popups with artist image)
 + figure out how to deal with marker clusters
++ add globe
