@@ -1,5 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import MarkerClusterGroup from "react-leaflet-cluster";      
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import ArtistPopup from './ArtistPopup';
 
 const ArtistMap = ({ artists 
@@ -7,7 +6,7 @@ const ArtistMap = ({ artists
      // one artist is one dictionary of different attributes
 }) => {
   return (
-      <MapContainer center={[0, 0]} zoom={3} class="my-10">
+      <MapContainer center={[0, 0]} zoom={3} className="my-10">
         <TileLayer 
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

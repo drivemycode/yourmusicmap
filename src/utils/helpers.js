@@ -85,10 +85,9 @@ export const fetchLastFMTopArtistsHelper = async (username) => {
         const data = await res.json();
 
         // data.topartists.artist is an array of the user's top artists
-        const arr = formatArtistsHelper(data.topartists.artist);
         console.log("Last fm top artists get req result");
         console.log(data); 
-        formatArtistsHelperV2(data.topartists.artist);
+        const arr = await formatArtistsHelperV2(data.topartists.artist);
       
         return arr;
     } catch(err) {
@@ -146,7 +145,7 @@ export const queryDB = async (query) => {
 
     const json = await res.json();
 
-    console.log(json)
+    return json;
   } catch(err) {
         console.error(`An error has occurred when trying to execute ${query}`, err);
   }
@@ -156,38 +155,126 @@ export const queryDB = async (query) => {
 export const formatArtistsHelperV2 = async (artists) => {
   // use batch post
 let q = "query {\n";
-
 artists.forEach((a, i) => {
-  const name = (a.name ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const name = (a.name ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"');
   const mbid = (a.mbid ?? "").trim();
 
-  if (!mbid) {
-    // name lookup (can return multiple)
-    q += `  a${i}: allArtists(condition: { name: "${name}" }, first: 10) {\n`;
-    q += `    nodes { gid name beginArea }\n`;
-    q += `  }\n`;
-  } else {
-    // mbid lookup (should return 0 or 1, so first: 1)
-    // UUID input is typically passed as a quoted string in GraphQL
-    q += `  a${i}: allArtists(condition: { gid: "${mbid}" }, first: 1) {\n`;
-    q += `    nodes { gid name beginArea }\n`;
-    q += `  }\n`;
+  const condition = mbid ? `gid: "${mbid}"` : `name: "${name}"`;
+  const first = mbid ? 1 : 10;
+
+  q += `  a${i}: allArtists(condition: { ${condition} }, first: ${first}) {
+    nodes {
+      gid
+      name
+      beginArea
+    }
   }
+`;
+});
+  q += "}\n";
+  const artistData = await queryDB(q);
+  console.log(artistData);
+
+  const artistNodes = Object.values(artistData?.data ?? {}).map((artistConnection) => {
+    const nodes = artistConnection?.nodes ?? [];
+    return nodes[0] ?? null;
   });
 
-  q += "}\n";
+  // for now.. ignore artists with NO begin area
+  const beginAreaIds = [...new Set(
+    artistNodes
+      .map((artist) => artist?.beginArea)
+      .filter((beginAreaId) => beginAreaId !== null && beginAreaId !== undefined)
+  )];
 
-  queryDB(q);
+  console.log(beginAreaIds);
+
+  let beginAreaById = new Map();
+  if (beginAreaIds.length > 0) {
+    const areaQuery = `query {
+  allAreas(filter: { id: { in: [${beginAreaIds.join(", ")}] } }, first: ${beginAreaIds.length}) {
+    nodes {
+      id
+      name
+    }
+  }
+}`;
+
+    const beginAreaData = await queryDB(areaQuery);
+
+    beginAreaById = new Map(
+      (beginAreaData?.data?.allAreas?.nodes ?? []).map((area) => [area.id, area.name])
+    );
+  }
 
   const url = new URL(`${MAPBOX_BASE_URL}/geocode/v6/batch`)
   url.searchParams.set("access_token", MAPBOX_ACCESS_TOKEN);
+  url.searchParams.set("limit", "1");
   let post_body = [];
-  const n = artists.length;
+  const n = artistNodes.length;
   for(let i = 0; i < n; i ++){
+      const beginAreaId = artistNodes[i]?.beginArea;
+      const beginAreaName = beginAreaById.get(beginAreaId) ?? null;
+
       post_body.push({
+        "q": beginAreaName,
         "types": ["district", "place", "locality"],
-        // need to somehow get location
       })
   }
 
+  let geocodeCollections = [];
+  if (post_body.some((entry) => entry.q)) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(post_body),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to geocode begin areas with Mapbox: ${res.status}`);
+      }
+
+      const geocodeData = await res.json();
+      geocodeCollections = Array.isArray(geocodeData?.batch)
+        ? geocodeData.batch
+        : Array.isArray(geocodeData)
+          ? geocodeData
+          : [];
+    } catch (err) {
+      console.error("Error trying to batch geocode begin areas:", err);
+    }
+  }
+
+  let formatted_artists = new Array(n);
+  for(let i = 0; i < n; i += 1){
+      const artistNode = artistNodes[i];
+      const beginAreaId = artistNode?.beginArea ?? null;
+      const beginAreaName = beginAreaById.get(beginAreaId) ?? null;
+      const featureCollection = geocodeCollections[i];
+      const originFeature = featureCollection?.features?.[0] ?? null;
+      const artistImage = [...(artists[i]?.image ?? [])]
+        .reverse()
+        .find((image) => image?.["#text"])?.["#text"] ?? null;
+
+      formatted_artists[i] = {
+        "gid": artistNode?.gid ?? null,
+        "name": artistNode?.name ?? artists[i]?.name ?? null,
+        "begin-area": beginAreaId !== null ? {
+          "id": beginAreaId,
+          "name": beginAreaName,
+        } : null,
+        "origin-features": originFeature,
+        "image": artistImage,
+        "playcount": artists[i]?.playcount,
+        "rank": artists[i]?.["@attr"]?.rank,
+        "url": artists[i]?.url,
+      };
+  }
+
+  return formatted_artists;
 }
