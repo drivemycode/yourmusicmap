@@ -2,7 +2,7 @@ import Header from "./Header";
 import { useState, useEffect } from "react";
 import { useDebounce } from "react-use";
 import { fetchLastFMTopArtistsHelper } from "../utils/helpers";
-import ArtistMap from "./ArtistMap";
+import GeoViewSwitcher from "./GeoViewSwitcher";
 
 
 const TopArtists = () => {
@@ -71,7 +71,7 @@ const TopArtists = () => {
         <div className="min-h-screen bg-gray-100 p-6">
             <Header />    
             <h2 className="my-20 text-center text-3xl font-bold text-slate-800">Your top artists came from..</h2>
-            <div className="flex justify-center mb-4">
+      <div className="flex justify-center mb-4">
         <input
           type="text"
           value={username}
@@ -85,7 +85,7 @@ const TopArtists = () => {
           {artists.length} artists mapped across {groupedArtists.length} locations
         </p>
       )}
-      <ArtistMap artists={groupedArtists}/>
+      <GeoViewSwitcher artists={groupedArtists}/>
         </div>
     )
 }

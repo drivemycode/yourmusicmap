@@ -1,0 +1,179 @@
+{
+  "version": 8,
+  "name": "YourMusicMap Globe",
+  "center": [
+    17.65431710431244,
+    32.954120326746775
+  ],
+  "zoom": 0.8619833357855968,
+  "pitch": 0,
+  "bearing": 0,
+  "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  "sources": {
+    "maplibre": {
+      "type": "vector",
+      "url": "https://demotiles.maplibre.org/tiles/tiles.json"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#bfe8ff"
+      }
+    },
+    {
+      "id": "countries-fill",
+      "type": "fill",
+      "source": "maplibre",
+      "source-layer": "countries",
+      "paint": {
+          "fill-color": "#a9dd7c",
+      "fill-opacity": 1
+    }
+    },
+    {
+      "id": "country-boundaries",
+      "type": "line",
+      "source": "maplibre",
+      "source-layer": "countries",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "rgba(240, 252, 255, 0.9)",
+        "line-width": {
+          "stops": [
+            [
+              1,
+              0.5
+            ],
+            [
+              4,
+              1
+            ],
+            [
+              7,
+              1.6
+            ]
+          ]
+        },
+        "line-opacity": 0.65
+      }
+    },
+    {
+      "id": "coastline",
+      "type": "line",
+      "source": "maplibre",
+      "source-layer": "countries",
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-color": "#4aa3d8",
+        "line-width": {
+          "stops": [
+            [
+              0,
+              0.8
+            ],
+            [
+              4,
+              1.5
+            ],
+            [
+              8,
+              2.6
+            ]
+          ]
+        },
+        "line-blur": 0.4,
+        "line-opacity": 0.8
+      }
+    },
+    {
+      "id": "graticule",
+      "type": "line",
+      "source": "maplibre",
+      "source-layer": "geolines",
+      "filter": [
+        "all",
+        [
+          "!=",
+          "name",
+          "International Date Line"
+        ]
+      ],
+      "paint": {
+        "line-color": "rgba(89, 149, 188, 0.38)",
+        "line-width": 1,
+        "line-dasharray": [
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": "country-labels",
+      "type": "symbol",
+      "source": "maplibre",
+      "source-layer": "centroids",
+      "minzoom": 1.5,
+      "layout": {
+        "text-font": [
+          "Open Sans Semibold"
+        ],
+        "text-size": {
+          "stops": [
+            [
+              2,
+              9
+            ],
+            [
+              4,
+              11
+            ],
+            [
+              6,
+              14
+            ]
+          ]
+        },
+        "text-field": {
+          "stops": [
+            [
+              2,
+              "{ABBREV}"
+            ],
+            [
+              4,
+              "{NAME}"
+            ]
+          ]
+        },
+        "text-max-width": 10,
+        "text-transform": {
+          "stops": [
+            [
+              0,
+              "uppercase"
+            ],
+            [
+              2,
+              "none"
+            ]
+          ]
+        }
+      },
+      "paint": {
+        "text-color": "#20412d",
+        "text-halo-color": "rgba(235, 249, 255, 0.92)",
+        "text-halo-width": 1.2,
+        "text-halo-blur": 0.3
+      }
+    }
+  ]
+}

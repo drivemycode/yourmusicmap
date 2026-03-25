@@ -4,7 +4,7 @@ import { useDebounce } from "react-use";
 import { findFlagUrlByIso2Code } from 'country-flags-svg-v2';
 
 import "leaflet/dist/leaflet.css";
-import ArtistMap from "./components/ArtistMap";
+import GeoViewSwitcher from "./components/GeoViewSwitcher";
 import Header from './components/Header';
 import { fetchOriginHelper, fetchArtistOriginFeaturesHelper } from "./utils/helpers";
 
@@ -66,7 +66,7 @@ export function App() {
       </div>
         {/* artists are an array [ [artist1.entity, artist1.originfeatures], ...  ] */
         }
-        <ArtistMap artists={[ {"mb": artistEntity, "origin-features": artistOriginFeatures } ]}/>
+        <GeoViewSwitcher artists={[ {"mb": artistEntity, "origin-features": artistOriginFeatures } ]}/>
     </div>
   );
 }
