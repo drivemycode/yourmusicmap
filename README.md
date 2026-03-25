@@ -11,9 +11,11 @@
 + npm run dev
 
 ## TODO list
-+ refactor anything involving mbapi to just using the postgresql database
-+ check if batch req for mapbox works
-+ cache of (mbid, artist name, ..)
-+ figure out how to deal with markers stylistically (deal with clusters, markers in the same city, popups with artist image)
-+ figure out how to deal with marker clusters
 + add globe
++ support top 10, 25, 50, ... all?
++ use redis to cache formatted_artists
++ search up name by alias too
++ change marker icon
++ get artist image (lastfm image links dont seem to work)
+
+

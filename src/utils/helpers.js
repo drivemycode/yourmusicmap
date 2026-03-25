@@ -192,6 +192,7 @@ artists.forEach((a, i) => {
   console.log(beginAreaIds);
 
   let beginAreaById = new Map();
+  let beginAreaCountryById = new Map();
   if (beginAreaIds.length > 0) {
     const areaQuery = `query {
   allAreas(filter: { id: { in: [${beginAreaIds.join(", ")}] } }, first: ${beginAreaIds.length}) {
@@ -207,6 +208,27 @@ artists.forEach((a, i) => {
     beginAreaById = new Map(
       (beginAreaData?.data?.allAreas?.nodes ?? []).map((area) => [area.id, area.name])
     );
+
+    let countryQuery = "query {\n";
+    beginAreaIds.forEach((beginAreaId, i) => {
+      countryQuery += `  c${i}: areaParentCountries(areaId: ${beginAreaId}) {
+    nodes {
+      countryName
+      depth
+    }
+  }
+`;
+    });
+    countryQuery += "}\n";
+
+    const beginAreaCountryData = await queryDB(countryQuery);
+
+    beginAreaCountryById = new Map(
+      beginAreaIds.map((beginAreaId, i) => {
+        const countryNodes = beginAreaCountryData?.data?.[`c${i}`]?.nodes ?? [];
+        return [beginAreaId, countryNodes[0]?.countryName ?? null];
+      })
+    );
   }
 
   const url = new URL(`${MAPBOX_BASE_URL}/geocode/v6/batch`)
@@ -217,9 +239,13 @@ artists.forEach((a, i) => {
   for(let i = 0; i < n; i ++){
       const beginAreaId = artistNodes[i]?.beginArea;
       const beginAreaName = beginAreaById.get(beginAreaId) ?? null;
+      const beginAreaCountryName = beginAreaCountryById.get(beginAreaId) ?? null;
+      const geocodeQuery = [beginAreaName, beginAreaCountryName]
+        .filter(Boolean)
+        .join(", ");
 
       post_body.push({
-        "q": beginAreaName,
+        "q": geocodeQuery || null,
         "types": ["district", "place", "locality"],
       })
   }

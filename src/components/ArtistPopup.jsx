@@ -8,12 +8,18 @@ const ArtistPopup = ({artist}) => {
     const locationLabel = beginAreaName || artist["origin-features"]?.properties?.name || "Unknown origin";
     const fallbackInitial = artistName.slice(0, 1).toUpperCase() || "?";
 
+    let varPopupKickerText = "";
+    groupedArtists.forEach(ga => {
+        varPopupKickerText += `#${ga["rank"]}, `
+    })
+    varPopupKickerText = varPopupKickerText.slice(0, -2);
+
     if ('rank' in artist || hasMultipleArtists) {
     return (
         <Popup className="artist-popup">
             <div className="artist-popup-card">
                 <p className="artist-popup-kicker">
-                    {hasMultipleArtists ? `${groupedArtists.length} artists from ${locationLabel}` : `#${artist["rank"]} from ${locationLabel}`}
+                    {`${varPopupKickerText} from ${locationLabel}`}
                 </p>
                 <div className="artist-popup-list">
                     {groupedArtists.map((groupArtist, index) => {
