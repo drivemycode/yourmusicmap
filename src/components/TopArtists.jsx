@@ -9,6 +9,7 @@ const TopArtists = () => {
     const [username, setUsername] = useState("");
     const [debouncedUsername, setDebouncedUsername] = useState('');
     const [artists, setArtists] = useState([]);
+    const [artistLimit, setArtistLimit] = useState("10");
 
     const groupedArtists = artists.reduce((groups, artist) => {
         const coordinates = artist["origin-features"]?.geometry?.coordinates;
@@ -51,7 +52,7 @@ const TopArtists = () => {
 
     const fetchLastFMTopArtists = async (name) => {
         try {
-            const topArtists = await fetchLastFMTopArtistsHelper(name);
+            const topArtists = await fetchLastFMTopArtistsHelper(name, artistLimit);
             setArtists(topArtists);
         } catch(err) {
             console.error("There's been an error fetching your top artists on Lastfm", err)
@@ -63,8 +64,8 @@ const TopArtists = () => {
     );
 
     useEffect(() => {
-        fetchLastFMTopArtists(username);
-    }, [debouncedUsername]);
+        fetchLastFMTopArtists(debouncedUsername);
+    }, [debouncedUsername, artistLimit]);
 
 
     return (
@@ -79,6 +80,22 @@ const TopArtists = () => {
           placeholder="Enter last.fm username.."
           className="border rounded-lg p-2 w-64"
         />
+      </div>
+      <div className="mb-6 flex justify-center">
+        <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+          Artist count
+          <select
+            value={artistLimit}
+            onChange={(e) => setArtistLimit(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2"
+          >
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="all">All</option>
+          </select>
+        </label>
       </div>
       {artists.length > 0 && (
         <p className="mb-6 text-center text-sm font-medium text-slate-600">

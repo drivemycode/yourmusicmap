@@ -46,54 +46,85 @@ export const fetchArtistOriginFeaturesHelper = async (artist_mb) => {
       query += beginArea_mb.relations[i].area.name + " ";
 
     }
-    const url = new URL(`${MAPBOX_BASE_URL}/geocode/v6/forward`);
-    url.searchParams.set("q", query);
-    url.searchParams.set("access_token", MAPBOX_ACCESS_TOKEN);
-    url.searchParams.set("limit", "1");
-    url.searchParams.set("types", "district,place,locality");
-
     try {
-        const res = await fetch(url);
+        const res = await fetch("/api/origin-features", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            artists: [{
+              gid: artist_mb?.id ?? null,
+              name: artist_mb?.name ?? null,
+              beginAreaName: beginArea_mb?.name ?? null,
+              beginAreaCountryName: beginArea_mb?.relations?.[0]?.area?.name ?? null,
+            }],
+          }),
+        });
         if(!res.ok){
-          throw new Error('Failed to fetch artist from LastFM');
+          throw new Error('Failed to fetch cached artist origin features');
         }
         const data = await res.json();   
+        const featureCollection = data?.results?.[0] ?? null;
         
-        if(data.features.length == 0) throw new Error("Mapbox could not find any features based on area-rels provided by MusicBrainz")
+        if((featureCollection?.features ?? []).length == 0) throw new Error("Mapbox could not find any features based on area-rels provided by MusicBrainz")
         
-        return data.features[0]; // return artist.originfeatures
+        return featureCollection.features[0]; // return artist.originfeatures
 
     } catch(err) {
         console.error("Error trying to find country using area-rels:", err);
     }
 }
 
-export const fetchLastFMTopArtistsHelper = async (username) => {
+const fetchLastFMTopArtistsPage = async (username, limit, page = 1) => {
     const url = new URL(LASTFM_BASE_URL);
     url.searchParams.set("method", "user.gettopartists");
     url.searchParams.set("user", username);
     url.searchParams.set("period", "overall");
-    url.searchParams.set("limit", 10);
+    url.searchParams.set("limit", limit);
+    url.searchParams.set("page", page);
     url.searchParams.set("api_key", LASTFM_API_KEY);
     url.searchParams.set("format", "json");
-    
-    try {
-        const res = await fetch(url);
-        if(!res.ok){
-            throw new Error('Failed to fetch artist from LastFM');
-        }
-        const data = await res.json();
 
-        // data.topartists.artist is an array of the user's top artists
+    const res = await fetch(url);
+    if(!res.ok){
+        throw new Error('Failed to fetch artist from LastFM');
+    }
+
+    return res.json();
+}
+
+export const fetchLastFMTopArtistsHelper = async (username, limit = 10) => {
+    try {
+        let topArtists = [];
+
+        if (limit === "all") {
+            let page = 1;
+            let totalPages = 1;
+
+            do {
+                const data = await fetchLastFMTopArtistsPage(username, 100, page);
+                const pageArtists = data?.topartists?.artist ?? [];
+                const attr = data?.topartists?.["@attr"] ?? {};
+
+                topArtists = topArtists.concat(pageArtists);
+                totalPages = Number(attr.totalPages ?? page);
+                page += 1;
+            } while (page <= totalPages);
+        } else {
+            const data = await fetchLastFMTopArtistsPage(username, limit, 1);
+            topArtists = data?.topartists?.artist ?? [];
+        }
+
         console.log("Last fm top artists get req result");
-        console.log(data); 
-        const arr = await formatArtistsHelperV2(data.topartists.artist);
-      
+        console.log(topArtists);
+
+        const arr = await formatArtistsHelperV2(topArtists);
+
         return arr;
     } catch(err) {
         console.error('An error has occurred when trying to find your top LastFM artists', err);
         return [];
-    } finally {
     }
 }
 
@@ -143,6 +174,10 @@ export const queryDB = async (query) => {
       })
     });
 
+    if (!res.ok) {
+      throw new Error(`GraphQL request failed with status ${res.status}`);
+    }
+
     const json = await res.json();
 
     return json;
@@ -151,36 +186,131 @@ export const queryDB = async (query) => {
   }
 }
 
+const chunkArray = (arr, chunkSize) => {
+  const chunks = [];
+
+  for (let i = 0; i < arr.length; i += chunkSize) {
+    chunks.push(arr.slice(i, i + chunkSize));
+  }
+
+  return chunks;
+};
+
 // format artists all at once in batch api calls
 export const formatArtistsHelperV2 = async (artists) => {
-  // use batch post
-let q = "query {\n";
-artists.forEach((a, i) => {
-  const name = (a.name ?? "")
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"');
-  const mbid = (a.mbid ?? "").trim();
+  const artistQueryChunks = chunkArray(artists, 40);
+  let artistNodes = [];
 
-  const condition = mbid ? `gid: "${mbid}"` : `name: "${name}"`;
-  const first = mbid ? 1 : 10;
+  for (const artistChunk of artistQueryChunks) {
+    let q = "query {\n";
 
-  q += `  a${i}: allArtists(condition: { ${condition} }, first: ${first}) {
+    artistChunk.forEach((a, i) => {
+      const name = (a.name ?? "")
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"');
+      const mbid = (a.mbid ?? "").trim();
+
+      if (mbid) {
+        q += `  artist${i}: allArtists(condition: { gid: "${mbid}" }, first: 1) {
     nodes {
+      id
       gid
       name
       beginArea
     }
   }
 `;
-});
-  q += "}\n";
-  const artistData = await queryDB(q);
-  console.log(artistData);
+        return;
+      }
 
-  const artistNodes = Object.values(artistData?.data ?? {}).map((artistConnection) => {
-    const nodes = artistConnection?.nodes ?? [];
-    return nodes[0] ?? null;
-  });
+      q += `  artist${i}: allArtists(condition: { name: "${name}" }, first: 10) {
+    nodes {
+      id
+      gid
+      name
+      beginArea
+    }
+  }
+  alias${i}: allArtistAliases(condition: { name: "${name}" }, first: 10) {
+    nodes {
+      artist
+    }
+  }
+`;
+    });
+
+    q += "}\n";
+    const artistData = await queryDB(q);
+
+    const chunkNodes = new Array(artistChunk.length).fill(null);
+    const aliasArtistIdsByIndex = new Map();
+
+    artistChunk.forEach((a, i) => {
+      const mbid = (a.mbid ?? "").trim();
+
+      if (mbid) {
+        const nodes = artistData?.data?.[`artist${i}`]?.nodes ?? [];
+        chunkNodes[i] = nodes[0] ?? null;
+        return;
+      }
+
+      const artistNodesByName = artistData?.data?.[`artist${i}`]?.nodes ?? [];
+      const directArtistMatch =
+        artistNodesByName.find((artist) => artist?.beginArea !== null && artist?.beginArea !== undefined)
+        ?? artistNodesByName[0]
+        ?? null;
+
+      if (directArtistMatch !== null) {
+        chunkNodes[i] = directArtistMatch;
+        return;
+      }
+
+      const aliasNodes = artistData?.data?.[`alias${i}`]?.nodes ?? [];
+      const aliasArtistIds = [...new Set(
+        aliasNodes
+          .map((aliasNode) => aliasNode?.artist)
+          .filter((artistId) => artistId !== null && artistId !== undefined)
+      )];
+
+      if (aliasArtistIds.length > 0) {
+        aliasArtistIdsByIndex.set(i, aliasArtistIds);
+      }
+    });
+
+    const aliasArtistIds = [...new Set(
+      [...aliasArtistIdsByIndex.values()].flat()
+    )];
+    if (aliasArtistIds.length > 0) {
+      const aliasArtistQuery = `query {
+  allArtists(filter: { id: { in: [${aliasArtistIds.join(", ")}] } }, first: ${aliasArtistIds.length}) {
+    nodes {
+      id
+      gid
+      name
+      beginArea
+    }
+  }
+}`;
+
+      const aliasArtistData = await queryDB(aliasArtistQuery);
+      const aliasArtistsById = new Map(
+        (aliasArtistData?.data?.allArtists?.nodes ?? []).map((artist) => [artist.id, artist])
+      );
+
+      aliasArtistIdsByIndex.forEach((artistIds, index) => {
+        const resolvedArtist =
+          artistIds
+            .map((artistId) => aliasArtistsById.get(artistId) ?? null)
+            .find((artist) => artist?.beginArea !== null && artist?.beginArea !== undefined)
+          ?? aliasArtistsById.get(artistIds[0])
+          ?? null;
+
+        chunkNodes[index] = resolvedArtist;
+      });
+    }
+
+    artistNodes = artistNodes.concat(chunkNodes);
+  }
 
   // for now.. ignore artists with NO begin area
   const beginAreaIds = [...new Set(
@@ -194,8 +324,11 @@ artists.forEach((a, i) => {
   let beginAreaById = new Map();
   let beginAreaCountryById = new Map();
   if (beginAreaIds.length > 0) {
-    const areaQuery = `query {
-  allAreas(filter: { id: { in: [${beginAreaIds.join(", ")}] } }, first: ${beginAreaIds.length}) {
+    const areaIdChunks = chunkArray(beginAreaIds, 200);
+
+    for (const areaIdChunk of areaIdChunks) {
+      const areaQuery = `query {
+  allAreas(filter: { id: { in: [${areaIdChunk.join(", ")}] } }, first: ${areaIdChunk.length}) {
     nodes {
       id
       name
@@ -203,74 +336,71 @@ artists.forEach((a, i) => {
   }
 }`;
 
-    const beginAreaData = await queryDB(areaQuery);
+      const beginAreaData = await queryDB(areaQuery);
 
-    beginAreaById = new Map(
-      (beginAreaData?.data?.allAreas?.nodes ?? []).map((area) => [area.id, area.name])
-    );
+      (beginAreaData?.data?.allAreas?.nodes ?? []).forEach((area) => {
+        beginAreaById.set(area.id, area.name);
+      });
+    }
 
-    let countryQuery = "query {\n";
-    beginAreaIds.forEach((beginAreaId, i) => {
-      countryQuery += `  c${i}: areaParentCountries(areaId: ${beginAreaId}) {
+    const countryIdChunks = chunkArray(beginAreaIds, 60);
+
+    for (const countryIdChunk of countryIdChunks) {
+      let countryQuery = "query {\n";
+      countryIdChunk.forEach((beginAreaId, i) => {
+        countryQuery += `  c${i}: areaParentCountries(areaId: ${beginAreaId}) {
     nodes {
       countryName
       depth
     }
   }
 `;
-    });
-    countryQuery += "}\n";
+      });
+      countryQuery += "}\n";
 
-    const beginAreaCountryData = await queryDB(countryQuery);
+      const beginAreaCountryData = await queryDB(countryQuery);
 
-    beginAreaCountryById = new Map(
-      beginAreaIds.map((beginAreaId, i) => {
+      countryIdChunk.forEach((beginAreaId, i) => {
         const countryNodes = beginAreaCountryData?.data?.[`c${i}`]?.nodes ?? [];
-        return [beginAreaId, countryNodes[0]?.countryName ?? null];
-      })
-    );
+        beginAreaCountryById.set(beginAreaId, countryNodes[0]?.countryName ?? null);
+      });
+    }
   }
 
-  const url = new URL(`${MAPBOX_BASE_URL}/geocode/v6/batch`)
-  url.searchParams.set("access_token", MAPBOX_ACCESS_TOKEN);
-  url.searchParams.set("limit", "1");
-  let post_body = [];
   const n = artistNodes.length;
-  for(let i = 0; i < n; i ++){
-      const beginAreaId = artistNodes[i]?.beginArea;
-      const beginAreaName = beginAreaById.get(beginAreaId) ?? null;
-      const beginAreaCountryName = beginAreaCountryById.get(beginAreaId) ?? null;
-      const geocodeQuery = [beginAreaName, beginAreaCountryName]
-        .filter(Boolean)
-        .join(", ");
-
-      post_body.push({
-        "q": geocodeQuery || null,
-        "types": ["district", "place", "locality"],
-      })
-  }
-
   let geocodeCollections = [];
-  if (post_body.some((entry) => entry.q)) {
+  const artistsForOriginLookup = artistNodes.map((artistNode, index) => {
+    const beginAreaId = artistNode?.beginArea ?? null;
+
+    return {
+      id: artistNode?.id ?? null,
+      gid: artistNode?.gid ?? null,
+      name: artistNode?.name ?? artists[index]?.name ?? null,
+      beginAreaName: beginAreaById.get(beginAreaId) ?? null,
+      beginAreaCountryName: beginAreaCountryById.get(beginAreaId) ?? null,
+    };
+  });
+
+  if (artistsForOriginLookup.some((artist) => artist.beginAreaName)) {
     try {
-      const res = await fetch(url, {
+      const res = await fetch("/api/origin-features", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(post_body),
+        body: JSON.stringify({
+          artists: artistsForOriginLookup,
+        }),
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to geocode begin areas with Mapbox: ${res.status}`);
+        throw new Error(`Failed to geocode begin areas with backend cache: ${res.status}`);
       }
 
       const geocodeData = await res.json();
-      geocodeCollections = Array.isArray(geocodeData?.batch)
-        ? geocodeData.batch
-        : Array.isArray(geocodeData)
-          ? geocodeData
-          : [];
+      geocodeCollections = Array.isArray(geocodeData?.results)
+        ? geocodeData.results
+        : [];
     } catch (err) {
       console.error("Error trying to batch geocode begin areas:", err);
     }
